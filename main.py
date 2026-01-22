@@ -13,10 +13,14 @@ logger = logging.getLogger(__name__)
 # --- FastAPI app ---
 app = FastAPI(title="Todo AI Chatbot API", version="1.0.0")
 
-# --- CORS middleware ---
+# --- CORS middleware (updated for Vercel frontend) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://phase-iii-frontend.vercel.app"  # <-- deployed frontend URL
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,7 +53,6 @@ def health_check():
 # --- Chat endpoint ---
 @app.post("/api/{user_id}/chat")
 async def chat_with_bot(user_id: str, request: ChatRequest):
-    """Chat endpoint that processes natural language messages and manages todos."""
     try:
         message = request.message.lower()
 
@@ -57,7 +60,12 @@ async def chat_with_bot(user_id: str, request: ChatRequest):
         if "add" in message or "create" in message:
             title = extract_task_title(message)
             if title:
-                result = handle_tool_call("add_task", user_id=user_id, title=title, description=f"Added via chat: {request.message}")
+                result = handle_tool_call(
+                    "add_task",
+                    user_id=user_id,
+                    title=title,
+                    description=f"Added via chat: {request.message}"
+                )
                 response = f"✅ Task added: {result.get('title', 'Unknown')}"
             else:
                 response = "❌ Could not extract task title. Please specify what task to add."
@@ -72,7 +80,7 @@ async def chat_with_bot(user_id: str, request: ChatRequest):
             tasks = handle_tool_call("list_tasks", user_id=user_id, status=status)
             if tasks:
                 response = f"📋 Your {status} tasks:\n" + "\n".join([
-                    f"• {task['id']}: {task['title']} ({'✅' if task['completed'] else '⏳'})" 
+                    f"• {task['id']}: {task['title']} ({'✅' if task['completed'] else '⏳'})"
                     for task in tasks
                 ])
             else:
@@ -123,7 +131,6 @@ async def chat_with_bot(user_id: str, request: ChatRequest):
 
 # --- Helper functions ---
 def extract_task_title(message: str) -> Optional[str]:
-    """Extract task title from message using simple patterns."""
     import re
     patterns = [
         r"add\s+(?:a\s+)?task\s+(?:to\s+)?(.+)",
@@ -137,7 +144,6 @@ def extract_task_title(message: str) -> Optional[str]:
     return message.strip()
 
 def extract_task_id(message: str) -> Optional[int]:
-    """Extract numeric task ID from message."""
     import re
     match = re.search(r'(?:task\s+)?(\d+)', message, re.IGNORECASE)
     return int(match.group(1)) if match else None
